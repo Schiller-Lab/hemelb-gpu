@@ -193,7 +193,7 @@ namespace hemelb
           [this](const hemelb::redblood::CellContainer & cells)
           {
             auto timestep = simulationState->GetTimeStep();
-            if ((timestep % 5000) == 0)
+            if ((timestep % 20000) == 0)
             {
               log::Logger::Log<log::Info, log::OnePerCore>("printstep %d, num cells %d", timestep, cells.size());
               for (auto cell: cells)

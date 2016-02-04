@@ -70,11 +70,11 @@ def deploy_cold():
     execute(build_python_tools)
 
 @task
-def update_build():
+def update_build(*configurations, **extras):
     """Update and do incremental build."""
     execute(update)
     execute(require_recopy)
-    execute(configure)
+    execute(configure, *configurations, **extras)
     execute(build)
     execute(install)
     execute(build_python_tools)
