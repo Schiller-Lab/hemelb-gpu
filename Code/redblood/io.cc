@@ -363,6 +363,7 @@ namespace hemelb
     bool validateCellEdgeLengths(const CellBase& cell)
     {
       auto edgeLength = cell.GetAverageEdgeLength();
+      log::Logger::Log<log::Critical, log::Singleton>("Average edge length (in LB units) %f", edgeLength);
 
       // Acceptable average edge length to voxel size ratio is [0.7, 1.3].
       // Note that cell vertices location is given in lattice units, therefore

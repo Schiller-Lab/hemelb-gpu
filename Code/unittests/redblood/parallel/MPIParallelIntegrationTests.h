@@ -83,7 +83,8 @@ namespace hemelb
           CopyResourceToTempdir("large_cylinder.gmy");
           CopyResourceToTempdir("red_blood_cell.txt");
 
-          ModifyXMLInput("large_cylinder_rbc.xml", { "simulation", "steps", "value" }, 20000);
+          ModifyXMLInput("large_cylinder_rbc.xml", { "simulation", "steps", "value" }, 30000);
+          ModifyXMLInput("large_cylinder_rbc.xml", { "redbloodcells", "cells", "cell", "scale", "value" }, 1.66e-06);
 
 //          auto set_modulus_to_zero = [this](std::string const &modulus_name)
 //          {
