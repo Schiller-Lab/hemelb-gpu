@@ -86,7 +86,7 @@ namespace hemelb
           ModifyXMLInput("large_cylinder_rbc.xml", { "redbloodcells", "cells", "cell", "scale", "value" }, 1.66e-06);
           // Get the RBC drop off point closer to a subdomain border so that we can test for cell communication
           // related issues with fewer timesteps.
-          ModifyXMLInput("large_cylinder_rbc.xml", { "simulation", "steps", "value" }, 5000);
+          ModifyXMLInput("large_cylinder_rbc.xml", { "simulation", "steps", "value" }, 7000);
           ModifyXMLInput("large_cylinder_rbc.xml", { "inlets", "inlet", "flowextension", "length", "value" }, 20e-6);
 
         }
