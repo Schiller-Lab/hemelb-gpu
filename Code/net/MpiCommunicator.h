@@ -153,7 +153,7 @@ namespace hemelb
         //! \brief Creates a graph communicator
         //! \param edges: [ [vertices connected to 0], [vertices connected to 1], ...]
         //! \param reorder: Whether nodes can be re-ordered
-        MpiCommunicator Graph(std::vector<std::vector<int>> edges, bool reorder = false) const;
+        MpiCommunicator Graph(std::vector<std::vector<int>> edges, bool reorder = true) const;
 
         //! \brief Returns graph neighberhood
         //! \details This communicator must have been created with graph
