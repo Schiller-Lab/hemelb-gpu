@@ -86,23 +86,23 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
   auto& site = siteData[siteIndex];
 
   // initialize hydroVars
-  distribn_t f[DmQn::NUMVECTORS];
+  distribn_t f_old_j;
+  distribn_t f_new_j;
   distribn_t density = 0.0;
   double3 momentum = make_double3(0.0, 0.0, 0.0);
-  distribn_t f_post[DmQn::NUMVECTORS];
 
   for ( Direction j = 0; j < DmQn::NUMVECTORS; ++j )
   {
-    // copy fOld to local memory
-    f[j] = fOld[siteIndex * DmQn::NUMVECTORS + j];
+    // copy fOld[i, j] to local memory
+    f_old_j = fOld[siteIndex * DmQn::NUMVECTORS + j];
 
     // Normal::DoCalculatePreCollision()
     // LBGK::DoCalculateDensityMomentumFeq()
     // Lattice::CalculateDensityAndMomentum()
-    density += f[j];
-    momentum.x += DmQn::CXD[j] * f[j];
-    momentum.y += DmQn::CYD[j] * f[j];
-    momentum.z += DmQn::CZD[j] * f[j];
+    density += f_old_j;
+    momentum.x += DmQn::CXD[j] * f_old_j;
+    momentum.y += DmQn::CYD[j] * f_old_j;
+    momentum.z += DmQn::CZD[j] * f_old_j;
   }
 
   // Lattice::CalculateFeq()
@@ -114,6 +114,9 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
 
   for ( Direction j = 0; j < DmQn::NUMVECTORS; ++j )
   {
+    // copy fOld[i, j] to local memory
+    f_old_j = fOld[siteIndex * DmQn::NUMVECTORS + j];
+
     if ( site.HasIolet(j) )
     {
       // NashZerothOrderPressureDelegate::StreamLink()
@@ -150,7 +153,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
           + DmQn::CYD[jj] * ioletMomentum.y
           + DmQn::CZD[jj] * ioletMomentum.z;
 
-      f_post[j] = DmQn::EQMWEIGHTS[jj]
+      f_new_j = DmQn::EQMWEIGHTS[jj]
           * (ioletDensity
               - (3. / 2.) * ioletDensity_1 * momentumMagnitudeSquared
               + (9. / 2.) * ioletDensity_1 * mom_dot_ei * mom_dot_ei
@@ -164,7 +167,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
           + DmQn::CYD[j] * momentum.y
           + DmQn::CZD[j] * momentum.z;
 
-      f_post[j] = DmQn::EQMWEIGHTS[j]
+      f_new_j = DmQn::EQMWEIGHTS[j]
           * (density
               - (3. / 2.) * density_1 * momentumMagnitudeSquared
               + (9. / 2.) * density_1 * mom_dot_ei * mom_dot_ei
@@ -172,13 +175,13 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
 
       // Normal::DoCollide()
       // LBGK::DoCollide()
-      f_post[j] = f[j] + lbmParams_omega * (f[j] - f_post[j]);
+      f_new_j = f_old_j + lbmParams_omega * (f_old_j - f_new_j);
     }
 
     // perform streaming
     int outIndex = Normal_LBGK_SBB_Nash_GetOutputIndex(siteIndex, j, site, neighbourIndices);
 
-    fNew[outIndex] = f_post[j];
+    fNew[outIndex] = f_new_j;
   }
 }
 
