@@ -731,18 +731,14 @@ namespace hemelb
       }
     }
 
-    void LatticeData::Transpose(distribn_t* M, site_t nRows, site_t nCols)
+    void LatticeData::Transpose(distribn_t* dst, const distribn_t* src, site_t nRows, site_t nCols)
     {
-      for ( int k = 0; k < nRows * nCols; k++ )
+      for ( int i = 0; i < nRows; i++ )
       {
-        int idx = k;
-
-        do {
-          // calculate index in the original array
-          idx = (idx % nRows) * nCols + (idx / nRows);
-        } while ( idx < k ); // make sure we don't swap elements twice
-
-        std::swap(M[k], M[idx]);
+        for ( int j = 0; j < nCols; j++ )
+        {
+          dst[j * nRows + i] = src[i * nCols + j];
+        }
       }
     }
 

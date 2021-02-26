@@ -334,15 +334,17 @@ namespace hemelb
         {
           // copy fOld (all sites) from device to host
           CUDA_SAFE_CALL(cudaMemcpy(
-            mLatDat->GetFOld(0),
+            mLatDat->GetFNew(0),
             mLatDat->GetFOldGPU(0),
             (localFluidSites * LatticeType::NUMVECTORS) * sizeof(distribn_t),
             cudaMemcpyDeviceToHost
           ));
 
           // transpose fOld (all sites) on host
+          // use fNew as temporary buffer
           mLatDat->Transpose(
             mLatDat->GetFOld(0),
+            mLatDat->GetFNew(0),
             LatticeType::NUMVECTORS,
             localFluidSites
           );
@@ -427,7 +429,9 @@ namespace hemelb
         if ( mSimConfig->UseGPU() )
         {
           // transpose fNew (all sites) on host
+          // use fOld as temporary buffer
           mLatDat->Transpose(
+            mLatDat->GetFOld(0),
             mLatDat->GetFNew(0),
             localFluidSites,
             LatticeType::NUMVECTORS
@@ -436,7 +440,7 @@ namespace hemelb
           // copy fNew (all sites) from host to device
           CUDA_SAFE_CALL(cudaMemcpyAsync(
             mLatDat->GetFNewGPU(0),
-            mLatDat->GetFNew(0),
+            mLatDat->GetFOld(0),
             (localFluidSites * LatticeType::NUMVECTORS) * sizeof(distribn_t),
             cudaMemcpyHostToDevice
           ));

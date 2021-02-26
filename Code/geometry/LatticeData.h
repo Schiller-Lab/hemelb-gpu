@@ -60,7 +60,7 @@ namespace hemelb
         void CopyReceivedGPU(int blockSize);
         void CopyReceived();
 
-        void Transpose(distribn_t* M, site_t nRows, site_t nCols);
+        void Transpose(distribn_t* dst, const distribn_t* src, site_t nRows, site_t nCols);
 
         /**
          * Get the lattice info object for the current lattice
