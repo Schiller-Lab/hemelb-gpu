@@ -40,9 +40,9 @@ void LatticeData::CopyReceivedGPU(int blockSize)
     return;
   }
 
-  const int GRID_SIZE = (totalSharedFs + blockSize - 1) / blockSize;
+  int gridSize = (totalSharedFs + blockSize - 1) / blockSize;
 
-  CopyReceivedKernel<<<GRID_SIZE, blockSize>>>(
+  CopyReceivedKernel<<<gridSize, blockSize>>>(
     streamingIndicesForReceivedDistributions_dev,
     GetFOldGPU(neighbouringProcs[0].FirstSharedDistribution),
     GetFNewGPU(0),

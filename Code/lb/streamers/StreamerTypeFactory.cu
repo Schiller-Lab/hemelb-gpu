@@ -47,15 +47,16 @@ int Normal_LBGK_SBB_Nash_GetOutputIndex(
   site_t siteIndex,
   Direction direction,
   const geometry::SiteData& site,
-  const site_t* neighbourIndices
+  const site_t* neighbourIndices,
+  site_t totalSiteCount
 )
 {
   // NashZerothOrderPressureDelegate::StreamLink()
   // SimpleBounceBackDelegate::StreamLink()
   // SimpleCollideAndStreamDelegate::StreamLink()
   return (site.HasIolet(direction) || site.HasWall(direction))
-    ? siteIndex * DmQn::NUMVECTORS + DmQn::INVERSEDIRECTIONS[direction]
-    : neighbourIndices[siteIndex * DmQn::NUMVECTORS + direction];
+    ? DmQn::INVERSEDIRECTIONS[direction] * totalSiteCount + siteIndex
+    : neighbourIndices[direction * totalSiteCount + siteIndex];
 }
 
 
@@ -72,6 +73,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
   const geometry::SiteData* siteData,
   const distribn_t* fOld,
   distribn_t* fNew,
+  site_t totalSiteCount,
   unsigned long timeStep
 )
 {
@@ -94,7 +96,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
   for ( Direction j = 0; j < DmQn::NUMVECTORS; ++j )
   {
     // copy fOld[i, j] to local memory
-    f_old_j = fOld[siteIndex * DmQn::NUMVECTORS + j];
+    f_old_j = fOld[j * totalSiteCount + siteIndex];
 
     // Normal::DoCalculatePreCollision()
     // LBGK::DoCalculateDensityMomentumFeq()
@@ -115,7 +117,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
   for ( Direction j = 0; j < DmQn::NUMVECTORS; ++j )
   {
     // copy fOld[i, j] to local memory
-    f_old_j = fOld[siteIndex * DmQn::NUMVECTORS + j];
+    f_old_j = fOld[j * totalSiteCount + siteIndex];
 
     if ( site.HasIolet(j) )
     {
@@ -179,7 +181,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
     }
 
     // perform streaming
-    int outIndex = Normal_LBGK_SBB_Nash_GetOutputIndex(siteIndex, j, site, neighbourIndices);
+    int outIndex = Normal_LBGK_SBB_Nash_GetOutputIndex(siteIndex, j, site, neighbourIndices, totalSiteCount);
 
     fNew[outIndex] = f_new_j;
   }
@@ -204,9 +206,9 @@ void Normal_LBGK_SBB_Nash::Type::StreamAndCollideGPU(
     return;
   }
 
-  const int GRID_SIZE = (siteCount + blockSize - 1) / blockSize;
+  int gridSize = (siteCount + blockSize - 1) / blockSize;
 
-  Normal_LBGK_SBB_Nash_StreamAndCollide<<<GRID_SIZE, blockSize>>>(
+  Normal_LBGK_SBB_Nash_StreamAndCollide<<<gridSize, blockSize>>>(
     firstIndex,
     siteCount,
     lbmParams->GetTau(),
@@ -217,6 +219,7 @@ void Normal_LBGK_SBB_Nash::Type::StreamAndCollideGPU(
     latDat->GetSiteDataGPU(),
     latDat->GetFOldGPU(0),
     latDat->GetFNewGPU(0),
+    latDat->GetLocalFluidSiteCount(),
     simState->Get0IndexedTimeStep()
   );
   CUDA_SAFE_CALL(cudaGetLastError());

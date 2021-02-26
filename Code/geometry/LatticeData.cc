@@ -731,6 +731,21 @@ namespace hemelb
       }
     }
 
+    void LatticeData::Transpose(distribn_t* M, site_t nRows, site_t nCols)
+    {
+      for ( int k = 0; k < nRows * nCols; k++ )
+      {
+        int idx = k;
+
+        do {
+          // calculate index in the original array
+          idx = (idx % nRows) * nCols + (idx / nRows);
+        } while ( idx < k ); // make sure we don't swap elements twice
+
+        std::swap(M[k], M[idx]);
+      }
+    }
+
     void LatticeData::Report(reporting::Dict& dictionary)
     {
       dictionary.SetIntValue("SITES", GetTotalFluidSites());
