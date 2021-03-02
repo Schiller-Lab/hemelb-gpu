@@ -23,8 +23,8 @@ using namespace hemelb::lb;
 
 __global__
 void TransposeStreamingIndicesKernel(
+  const site_t* neighbourIndices,
   site_t* streamingIndices,
-  site_t* neighbourIndices,
   site_t nSites,
   site_t nDirections
 )
@@ -41,25 +41,22 @@ void TransposeStreamingIndicesKernel(
   Direction inDirection = inIndex / nSites;
   site_t inSite = inIndex % nSites;
 
-  // decode output index from AoS layout
+  // get AoS encoded output index
   site_t outIndex = neighbourIndices[inSite * nDirections + inDirection];
-  site_t outSite;
-  site_t outDirection;
 
-  // check for rubbish site
-  if ( outIndex == nSites * nDirections )
+  // convert output index to SoA layout if it is a local site
+  if ( outIndex < nSites * nDirections )
   {
-    outSite = 0;
-    outDirection = nDirections;
+    site_t outSite = outIndex / nDirections;
+    site_t outDirection = outIndex % nDirections;
+    outIndex = outDirection * nSites + outSite;
   }
-  else
-  {
-    outSite = outIndex / nDirections;
-    outDirection = outIndex % nDirections;
-  }
+
+  // pass through if output index is rubbish site or shared edge
+  // else { outIndex = outIndex; }
 
   // encode output index to SoA layout
-  streamingIndices[inIndex] = outDirection * nSites + outSite;
+  streamingIndices[inIndex] = outIndex;
 }
 
 
@@ -133,8 +130,8 @@ void LatticeData::PrepareStreamingIndicesGPU()
   CUDA_SAFE_CALL(cudaMalloc(&tempIndices_dev, latticeInfo.GetNumVectors() * localFluidSites * sizeof(site_t)));
 
   TransposeStreamingIndicesKernel<<<gridSize, blockSize>>>(
-    tempIndices_dev,
     streamingIndices_dev,
+    tempIndices_dev,
     nSites,
     nDirections
   );
