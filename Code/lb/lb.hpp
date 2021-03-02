@@ -210,17 +210,20 @@ namespace hemelb
         cudaMemcpyHostToDevice
       ));
 
-      // transfer fOld and fNew to GPU
       site_t localFluidSites = mLatDat->GetLocalFluidSiteCount();
 
+      // transpose fOld (all sites) on host
+      // use fNew as temporary buffer
+      mLatDat->Transpose(
+        mLatDat->GetFNew(0),
+        mLatDat->GetFOld(0),
+        localFluidSites,
+        LatticeType::NUMVECTORS
+      );
+
+      // copy fOld (all sites) from host to device
       CUDA_SAFE_CALL(cudaMemcpyAsync(
         mLatDat->GetFOldGPU(0),
-        mLatDat->GetFOld(0),
-        (localFluidSites * LatticeType::NUMVECTORS) * sizeof(distribn_t),
-        cudaMemcpyHostToDevice
-      ));
-      CUDA_SAFE_CALL(cudaMemcpyAsync(
-        mLatDat->GetFNewGPU(0),
         mLatDat->GetFNew(0),
         (localFluidSites * LatticeType::NUMVECTORS) * sizeof(distribn_t),
         cudaMemcpyHostToDevice
