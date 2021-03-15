@@ -19,6 +19,7 @@ CMakeFiles/*
 CMakeCache.txt
 Code/client/displayClient
 .DS_Store
+.ipynb_checkpoints
 diffs
 dependencies/Makefile
 dependencies/cmake_install.cmake
