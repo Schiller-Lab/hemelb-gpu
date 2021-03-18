@@ -58,15 +58,15 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
   unsigned long timeStep
 )
 {
-  site_t i = blockIdx.x * blockDim.x + threadIdx.x;
+  site_t offset = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if ( i >= siteCount )
+  if ( offset >= siteCount )
   {
     return;
   }
 
-  site_t siteIndex = firstIndex + i;
-  auto& site = siteData[siteIndex];
+  site_t i = firstIndex + offset;
+  auto& site = siteData[i];
 
   // initialize hydroVars
   distribn_t f_old_j;
@@ -77,7 +77,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
   for ( Direction j = 0; j < DmQn::NUMVECTORS; ++j )
   {
     // copy fOld[i, j] to local memory
-    f_old_j = fOld[j * totalSiteCount + siteIndex];
+    f_old_j = fOld[j * totalSiteCount + i];
 
     // Normal::DoCalculatePreCollision()
     // LBGK::DoCalculateDensityMomentumFeq()
@@ -144,7 +144,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
     else
     {
       // copy fOld[i, j] to local memory
-      f_old_j = fOld[j * totalSiteCount + siteIndex];
+      f_old_j = fOld[j * totalSiteCount + i];
 
       // Lattice::CalculateFeq()
       const distribn_t mom_dot_ei =
@@ -164,7 +164,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
     }
 
     // stream f_new_j to pre-determined output location
-    site_t outputIndex = streamingIndices[j * totalSiteCount + siteIndex];
+    site_t outputIndex = streamingIndices[j * totalSiteCount + i];
 
     fNew[outputIndex] = f_new_j;
   }
