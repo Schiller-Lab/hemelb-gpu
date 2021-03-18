@@ -24,7 +24,6 @@ include("cmake/options.cmake")
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set( CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -std=c++11 -Xptxas=-v")
 set( CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_60,code=sm_60")
-set( CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_61,code=sm_61")
 set( CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_70,code=sm_70") 
 
 if (HEMELB_USE_ALL_WARNINGS_GNU)
