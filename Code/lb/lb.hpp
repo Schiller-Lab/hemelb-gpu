@@ -210,17 +210,20 @@ namespace hemelb
         cudaMemcpyHostToDevice
       ));
 
-      // transfer fOld and fNew to GPU
       site_t localFluidSites = mLatDat->GetLocalFluidSiteCount();
 
+      // transpose fOld (all sites) on host
+      // use fNew as temporary buffer
+      mLatDat->Transpose(
+        mLatDat->GetFNew(0),
+        mLatDat->GetFOld(0),
+        localFluidSites,
+        LatticeType::NUMVECTORS
+      );
+
+      // copy fOld (all sites) from host to device
       CUDA_SAFE_CALL(cudaMemcpyAsync(
         mLatDat->GetFOldGPU(0),
-        mLatDat->GetFOld(0),
-        (localFluidSites * LatticeType::NUMVECTORS) * sizeof(distribn_t),
-        cudaMemcpyHostToDevice
-      ));
-      CUDA_SAFE_CALL(cudaMemcpyAsync(
-        mLatDat->GetFNewGPU(0),
         mLatDat->GetFNew(0),
         (localFluidSites * LatticeType::NUMVECTORS) * sizeof(distribn_t),
         cudaMemcpyHostToDevice
@@ -318,7 +321,7 @@ namespace hemelb
         mMidFluidStreamer->StreamAndCollideGPU(offset, mLatDat->GetDomainEdgeSiteCount(), &mParams, mLatDat, mState, inlets_dev, outlets_dev, mSimConfig->GPUBlockSize());
 
 #ifndef HEMELB_CUDA_AWARE_MPI
-        // copy fNew (sharedFs) from device to host
+        // copy fNew (shared edges) from device to host
         CUDA_SAFE_CALL(cudaMemcpy(
           mLatDat->GetFNew(localFluidSites * LatticeType::NUMVECTORS + 1),
           mLatDat->GetFNewGPU(localFluidSites * LatticeType::NUMVECTORS + 1),
@@ -334,11 +337,20 @@ namespace hemelb
         {
           // copy fOld (all sites) from device to host
           CUDA_SAFE_CALL(cudaMemcpy(
-            mLatDat->GetFOld(0),
+            mLatDat->GetFNew(0),
             mLatDat->GetFOldGPU(0),
             (localFluidSites * LatticeType::NUMVECTORS) * sizeof(distribn_t),
             cudaMemcpyDeviceToHost
           ));
+
+          // transpose fOld (all sites) on host
+          // use fNew as temporary buffer
+          mLatDat->Transpose(
+            mLatDat->GetFOld(0),
+            mLatDat->GetFNew(0),
+            LatticeType::NUMVECTORS,
+            localFluidSites
+          );
         }
 
         StreamAndCollide(mMidFluidStreamer, offset, mLatDat->GetDomainEdgeCollisionCount(0));
@@ -362,7 +374,7 @@ namespace hemelb
 
         if ( mSimConfig->UseGPU() )
         {
-          // copy fNew (sharedFs) from host to device
+          // copy fNew (shared edges) from host to device
           CUDA_SAFE_CALL(cudaMemcpyAsync(
             mLatDat->GetFNewGPU(localFluidSites * LatticeType::NUMVECTORS + 1),
             mLatDat->GetFNew(localFluidSites * LatticeType::NUMVECTORS + 1),
@@ -419,10 +431,19 @@ namespace hemelb
 
         if ( mSimConfig->UseGPU() )
         {
+          // transpose fNew (all sites) on host
+          // use fOld as temporary buffer
+          mLatDat->Transpose(
+            mLatDat->GetFOld(0),
+            mLatDat->GetFNew(0),
+            localFluidSites,
+            LatticeType::NUMVECTORS
+          );
+
           // copy fNew (all sites) from host to device
           CUDA_SAFE_CALL(cudaMemcpyAsync(
             mLatDat->GetFNewGPU(0),
-            mLatDat->GetFNew(0),
+            mLatDat->GetFOld(0),
             (localFluidSites * LatticeType::NUMVECTORS) * sizeof(distribn_t),
             cudaMemcpyHostToDevice
           ));
@@ -447,7 +468,7 @@ namespace hemelb
         site_t localFluidSites = mLatDat->GetLocalFluidSiteCount();
         site_t sharedFs = mLatDat->GetNumSharedFs();
 
-        // copy fOld (sharedFs) from host to device
+        // copy fOld (shared edges) from host to device
         CUDA_SAFE_CALL(cudaMemcpyAsync(
           mLatDat->GetFOldGPU(localFluidSites * LatticeType::NUMVECTORS + 1),
           mLatDat->GetFOld(localFluidSites * LatticeType::NUMVECTORS + 1),

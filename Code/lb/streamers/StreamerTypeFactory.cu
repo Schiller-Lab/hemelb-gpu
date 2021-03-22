@@ -42,24 +42,6 @@ public:
 
 
 
-__device__
-int Normal_LBGK_SBB_Nash_GetOutputIndex(
-  site_t siteIndex,
-  Direction direction,
-  const geometry::SiteData& site,
-  const site_t* neighbourIndices
-)
-{
-  // NashZerothOrderPressureDelegate::StreamLink()
-  // SimpleBounceBackDelegate::StreamLink()
-  // SimpleCollideAndStreamDelegate::StreamLink()
-  return (site.HasIolet(direction) || site.HasWall(direction))
-    ? siteIndex * DmQn::NUMVECTORS + DmQn::INVERSEDIRECTIONS[direction]
-    : neighbourIndices[siteIndex * DmQn::NUMVECTORS + direction];
-}
-
-
-
 __global__
 void Normal_LBGK_SBB_Nash_StreamAndCollide(
   site_t firstIndex,
@@ -68,41 +50,42 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
   distribn_t lbmParams_omega,
   const iolets::InOutLetCosineGPU* inlets,
   const iolets::InOutLetCosineGPU* outlets,
-  const site_t* neighbourIndices,
+  const site_t* streamingIndices,
   const geometry::SiteData* siteData,
   const distribn_t* fOld,
   distribn_t* fNew,
+  site_t totalSiteCount,
   unsigned long timeStep
 )
 {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  site_t offset = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if ( i >= siteCount )
+  if ( offset >= siteCount )
   {
     return;
   }
 
-  site_t siteIndex = firstIndex + i;
-  auto& site = siteData[siteIndex];
+  site_t i = firstIndex + offset;
+  auto& site = siteData[i];
 
   // initialize hydroVars
-  distribn_t f[DmQn::NUMVECTORS];
+  distribn_t f_old_j;
+  distribn_t f_new_j;
   distribn_t density = 0.0;
   double3 momentum = make_double3(0.0, 0.0, 0.0);
-  distribn_t f_post[DmQn::NUMVECTORS];
 
   for ( Direction j = 0; j < DmQn::NUMVECTORS; ++j )
   {
-    // copy fOld to local memory
-    f[j] = fOld[siteIndex * DmQn::NUMVECTORS + j];
+    // copy fOld[i, j] to local memory
+    f_old_j = fOld[j * totalSiteCount + i];
 
     // Normal::DoCalculatePreCollision()
     // LBGK::DoCalculateDensityMomentumFeq()
     // Lattice::CalculateDensityAndMomentum()
-    density += f[j];
-    momentum.x += DmQn::CXD[j] * f[j];
-    momentum.y += DmQn::CYD[j] * f[j];
-    momentum.z += DmQn::CZD[j] * f[j];
+    density += f_old_j;
+    momentum.x += DmQn::CXD[j] * f_old_j;
+    momentum.y += DmQn::CYD[j] * f_old_j;
+    momentum.z += DmQn::CZD[j] * f_old_j;
   }
 
   // Lattice::CalculateFeq()
@@ -127,14 +110,16 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
 
       // compute momentum at the iolet
       distribn_t component =
-          (momentum.x / density) * iolet.normal.x
-          + (momentum.y / density) * iolet.normal.y
-          + (momentum.z / density) * iolet.normal.z;
+          momentum.x * iolet.normal.x
+          + momentum.y * iolet.normal.y
+          + momentum.z * iolet.normal.z;
+
+      component *= ioletDensity / density;
 
       double3 ioletMomentum;
-      ioletMomentum.x = iolet.normal.x * component * ioletDensity;
-      ioletMomentum.y = iolet.normal.y * component * ioletDensity;
-      ioletMomentum.z = iolet.normal.z * component * ioletDensity;
+      ioletMomentum.x = iolet.normal.x * component;
+      ioletMomentum.y = iolet.normal.y * component;
+      ioletMomentum.z = iolet.normal.z * component;
 
       // compute f_eq at the iolet
       // Lattice::CalculateFeq()
@@ -150,7 +135,7 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
           + DmQn::CYD[jj] * ioletMomentum.y
           + DmQn::CZD[jj] * ioletMomentum.z;
 
-      f_post[j] = DmQn::EQMWEIGHTS[jj]
+      f_new_j = DmQn::EQMWEIGHTS[jj]
           * (ioletDensity
               - (3. / 2.) * ioletDensity_1 * momentumMagnitudeSquared
               + (9. / 2.) * ioletDensity_1 * mom_dot_ei * mom_dot_ei
@@ -158,13 +143,16 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
     }
     else
     {
+      // copy fOld[i, j] to local memory
+      f_old_j = fOld[j * totalSiteCount + i];
+
       // Lattice::CalculateFeq()
       const distribn_t mom_dot_ei =
           DmQn::CXD[j] * momentum.x
           + DmQn::CYD[j] * momentum.y
           + DmQn::CZD[j] * momentum.z;
 
-      f_post[j] = DmQn::EQMWEIGHTS[j]
+      f_new_j = DmQn::EQMWEIGHTS[j]
           * (density
               - (3. / 2.) * density_1 * momentumMagnitudeSquared
               + (9. / 2.) * density_1 * mom_dot_ei * mom_dot_ei
@@ -172,13 +160,13 @@ void Normal_LBGK_SBB_Nash_StreamAndCollide(
 
       // Normal::DoCollide()
       // LBGK::DoCollide()
-      f_post[j] = f[j] + lbmParams_omega * (f[j] - f_post[j]);
+      f_new_j = f_old_j + lbmParams_omega * (f_old_j - f_new_j);
     }
 
-    // perform streaming
-    int outIndex = Normal_LBGK_SBB_Nash_GetOutputIndex(siteIndex, j, site, neighbourIndices);
+    // stream f_new_j to pre-determined output location
+    site_t outputIndex = streamingIndices[j * totalSiteCount + i];
 
-    fNew[outIndex] = f_post[j];
+    fNew[outputIndex] = f_new_j;
   }
 }
 
@@ -201,19 +189,20 @@ void Normal_LBGK_SBB_Nash::Type::StreamAndCollideGPU(
     return;
   }
 
-  const int GRID_SIZE = (siteCount + blockSize - 1) / blockSize;
+  int gridSize = (siteCount + blockSize - 1) / blockSize;
 
-  Normal_LBGK_SBB_Nash_StreamAndCollide<<<GRID_SIZE, blockSize>>>(
+  Normal_LBGK_SBB_Nash_StreamAndCollide<<<gridSize, blockSize>>>(
     firstIndex,
     siteCount,
     lbmParams->GetTau(),
     lbmParams->GetOmega(),
     inlets,
     outlets,
-    latDat->GetNeighbourIndicesGPU(),
+    latDat->GetStreamingIndicesGPU(),
     latDat->GetSiteDataGPU(),
     latDat->GetFOldGPU(0),
     latDat->GetFNewGPU(0),
+    latDat->GetLocalFluidSiteCount(),
     simState->Get0IndexedTimeStep()
   );
   CUDA_SAFE_CALL(cudaGetLastError());

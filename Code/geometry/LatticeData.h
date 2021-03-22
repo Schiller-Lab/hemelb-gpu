@@ -55,10 +55,14 @@ namespace hemelb
           std::swap(oldDistributions_dev, newDistributions_dev);
         }
 
+        void PrepareStreamingIndicesGPU();
+
         void SendAndReceiveGPU(net::Net* net);
         void SendAndReceive(net::Net* net);
         void CopyReceivedGPU(int blockSize);
         void CopyReceived();
+
+        void Transpose(distribn_t* dst, const distribn_t* src, site_t nRows, site_t nCols);
 
         /**
          * Get the lattice info object for the current lattice
@@ -193,9 +197,9 @@ namespace hemelb
           return &newDistributions[distributionIndex];
         }
 
-        inline site_t* GetNeighbourIndicesGPU()
+        inline site_t* GetStreamingIndicesGPU()
         {
-          return neighbourIndices_dev;
+          return streamingIndices_dev;
         }
 
         inline SiteData* GetSiteDataGPU()
@@ -616,7 +620,7 @@ namespace hemelb
         const net::IOCommunicator& comms;
 
         // GPU buffers
-        site_t* neighbourIndices_dev;
+        site_t* streamingIndices_dev;
         site_t* streamingIndicesForReceivedDistributions_dev;
         SiteData* siteData_dev;
         distribn_t* oldDistributions_dev;

@@ -61,20 +61,23 @@ namespace hemelb
       CUDA_SAFE_CALL(cudaMalloc(&siteData_dev, localFluidSites * sizeof(SiteData)));
       CUDA_SAFE_CALL(cudaMemcpyAsync(siteData_dev, siteData.data(), localFluidSites * sizeof(SiteData), cudaMemcpyHostToDevice));
 
-      // initialize GPU buffer for neighbour indices
-      CUDA_SAFE_CALL(cudaMalloc(&neighbourIndices_dev, localFluidSites * latticeInfo.GetNumVectors() * sizeof(site_t)));
-      CUDA_SAFE_CALL(cudaMemcpyAsync(neighbourIndices_dev, neighbourIndices.data(), localFluidSites * latticeInfo.GetNumVectors() * sizeof(site_t), cudaMemcpyHostToDevice));
+      // initialize GPU buffer for streaming indices
+      CUDA_SAFE_CALL(cudaMalloc(&streamingIndices_dev, latticeInfo.GetNumVectors() * localFluidSites * sizeof(site_t)));
+      CUDA_SAFE_CALL(cudaMemcpyAsync(streamingIndices_dev, neighbourIndices.data(), latticeInfo.GetNumVectors() * localFluidSites * sizeof(site_t), cudaMemcpyHostToDevice));
 
-      // initialize GPU buffer for shared neighbour indices
+      // initialize GPU buffer for shared streaming indices
       CUDA_SAFE_CALL(cudaMalloc(&streamingIndicesForReceivedDistributions_dev, totalSharedFs * sizeof(site_t)));
       CUDA_SAFE_CALL(cudaMemcpyAsync(streamingIndicesForReceivedDistributions_dev, streamingIndicesForReceivedDistributions.data(), totalSharedFs * sizeof(site_t), cudaMemcpyHostToDevice));
 
-      // initialize GPU buffers for distributions
-      CUDA_SAFE_CALL(cudaMallocHost(&oldDistributions, (localFluidSites * latticeInfo.GetNumVectors() + 1 + totalSharedFs) * sizeof(distribn_t)));
-      CUDA_SAFE_CALL(cudaMallocHost(&newDistributions, (localFluidSites * latticeInfo.GetNumVectors() + 1 + totalSharedFs) * sizeof(distribn_t)));
+      // prepare streaming indices
+      PrepareStreamingIndicesGPU();
 
-      CUDA_SAFE_CALL(cudaMalloc(&oldDistributions_dev, (localFluidSites * latticeInfo.GetNumVectors() + 1 + totalSharedFs) * sizeof(distribn_t)));
-      CUDA_SAFE_CALL(cudaMalloc(&newDistributions_dev, (localFluidSites * latticeInfo.GetNumVectors() + 1 + totalSharedFs) * sizeof(distribn_t)));
+      // initialize GPU buffers for distributions
+      CUDA_SAFE_CALL(cudaMallocHost(&oldDistributions, (latticeInfo.GetNumVectors() * localFluidSites + 1 + totalSharedFs) * sizeof(distribn_t)));
+      CUDA_SAFE_CALL(cudaMallocHost(&newDistributions, (latticeInfo.GetNumVectors() * localFluidSites + 1 + totalSharedFs) * sizeof(distribn_t)));
+
+      CUDA_SAFE_CALL(cudaMalloc(&oldDistributions_dev, (latticeInfo.GetNumVectors() * localFluidSites + 1 + totalSharedFs) * sizeof(distribn_t)));
+      CUDA_SAFE_CALL(cudaMalloc(&newDistributions_dev, (latticeInfo.GetNumVectors() * localFluidSites + 1 + totalSharedFs) * sizeof(distribn_t)));
     }
 
     void LatticeData::SetBasicDetails(util::Vector3D<site_t> blocksIn,
@@ -728,6 +731,17 @@ namespace hemelb
       {
         *GetFNew(streamingIndicesForReceivedDistributions[i]) = *GetFOld(neighbouringProcs[0].FirstSharedDistribution
             + i);
+      }
+    }
+
+    void LatticeData::Transpose(distribn_t* dst, const distribn_t* src, site_t nRows, site_t nCols)
+    {
+      for ( int i = 0; i < nRows; i++ )
+      {
+        for ( int j = 0; j < nCols; j++ )
+        {
+          dst[j * nRows + i] = src[i * nCols + j];
+        }
       }
     }
 
